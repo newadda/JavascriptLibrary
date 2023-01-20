@@ -8,6 +8,8 @@ import VectorLayer from 'ol/layer/Vector.js';
 import VectorSource from 'ol/source/Vector.js';
 import Overlay from 'ol/Overlay.js';
 
+import { Point,LineString ,Polygon} from 'ol/geom';
+
 // source
 import XYZ from 'ol/source/XYZ';
 import OSM from 'ol/source/OSM.js';
@@ -31,6 +33,7 @@ import {WKT} from 'ol/format.js'
 
 
 
+
 ////////// Utils
 class OGisUtils{
 
@@ -49,17 +52,37 @@ class OGisUtils{
             features: new GeoJSON().readFeatures(geojsonObject),
           });
     }
+
+    static createDefaultStyle(feature)
+    {
+        const styles={
+            'Point' :new Style({
+                image: new Circle({
+                  radius: 7,
+                  fill: new Fill({
+                    color: 'black',
+                  }),
+                  stroke: new Stroke({
+                    color: 'white',
+                    width: 2,
+                  }),
+                }),
+              })
+        }
+
+        const geometry = feature.getGeometry()
+        if(geometry instanceof Point)
+        {
+           
+            return styles[Point.name]
+        }
+
+    }
 }
 
 
 
 
-const FeatureType = Object.freeze({
-    Point:'Point',
-    LineString:'LineString',
-    Polygon:'Polygon',
-    PolygonBox:'PolygonBox'
-}) ;
 
 
 
@@ -79,6 +102,22 @@ function emptyVectorLayer()
     });
     return layerVector;
 }
+
+
+
+
+
+////////////////////////////////////////////////////////////////////
+
+
+
+const FeatureType = Object.freeze({
+    Point:'Point',
+    LineString:'LineString',
+    Polygon:'Polygon',
+    PolygonBox:'PolygonBox'
+}) ;
+
 
 
 
@@ -216,7 +255,6 @@ function emptyVectorLayer()
 
 
     /// 다중 선택시 나오는 Overlay UI
-
     /**
      * 
      * @param {(this,overlay,fectureList) : return element} func 
