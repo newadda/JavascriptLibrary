@@ -1,75 +1,108 @@
 <template>
-
-
-<div>
+  <div>
     <button @click="modi">수정</button>
-    <div ref="map"   style="width: 100%;height: 800px"></div>
-</div>
-
-
+    <div ref="map" style="width: 100%; height: 800px"></div>
+  </div>
 </template>
 
 <script>
-import { defineComponent } from 'vue'
-import {OGis,FeatureType,test} from '../lib/gis/gislib'
+import { defineComponent } from "vue";
+import { OGis, FeatureType, test } from "../lib/gis/gislib";
 
-import OSM from 'ol/source/OSM.js';
-import TileLayer from 'ol/layer/Tile.js';
+import OSM from "ol/source/OSM.js";
+import TileLayer from "ol/layer/Tile.js";
+
+import VectorLayer from "ol/layer/Vector.js";
+import VectorSource from "ol/source/Vector.js";
+import GeoJSON from "ol/format/GeoJSON.js";
+import { bbox as bboxStrategy } from "ol/loadingstrategy.js";
+// style
+import { Circle, Fill, Icon, Stroke, Style, Text } from "ol/style.js";
 
 export default defineComponent({
-    setup() {
-        
-
-    },
-    data() {
+  setup() {},
+  data() {
     return {
-        ogis:null,
-    }
+      ogis: null,
+    };
   },
-    mounted(){
-        test();
-        let ogis = new OGis(this.$refs.map)
-      
-       // ogis.drawOn(FeatureType.PolygonBox);
-        this.ogis=ogis;
+  mounted() {
+    test();
+    let ogis = new OGis(this.$refs.map);
+
+    const pipeSource = new VectorSource({
+      format: new GeoJSON(),
+      url: function (extent) {
+        return (
+          "http://127.0.0.1:8081/geoserver/waterworks/ows?service=WFS&" +
+          "version=1.1.0&request=GetFeature&typeName=waterworks:FTR_WTL_PIPE_LM&" +
+          "outputFormat=application/json&srsname=EPSG:4326&maxFeatures=10000&" +
+          "bbox=" +
+          extent.join(",") +
+          ",EPSG:4326"
+        );
+      },
+      strategy: bboxStrategy,
+    });
+
+    const pipeVector = new VectorLayer({
+      source: pipeSource,
+      style: new Style({
+        stroke: new Stroke({
+          color: "green",
+          width: 2,
+        }),
+        text: new Text({
+          textAlign: "center",
+          textBaseline: "middle",
+          font: "Blod" + " " + "30px" + "/" + 3 + " " + "arial",
+          text: "111111111111111",
+          fill: new Fill({ color: "blue" }),
+          stroke: new Stroke({ color: "0xff00ff", width: 3.0 }),
+          offsetX: 0,
+          offsetY: 0,
+          placement: "line",
+          maxAngle: Math.PI / 4,
+          overflow: false,
+          rotation: 0.0,
+        }),
+      }),
+
+      zIndex: 102,
+    });
+
+    // ogis.drawOn(FeatureType.PolygonBox);
+    this.ogis = ogis;
+
+    this.ogis.addVectorLayer(pipeVector);
+  },
+  methods: {
+    modi() {
+      this.ogis.modifyFeature();
     },
-    methods:{
-        modi(){
-            this.ogis.modifyFeature()
-        },
-        abti()
-        {
-
-            let geojson = {
-  "type": "FeatureCollection",
-  "features": [
-    {
-      "type": "Feature",
-      "properties": {},
-      "geometry": {
-        "coordinates": [
-          127.72459494610746,
-          36.72507494392501
+    abti() {
+      let geojson = {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            properties: {},
+            geometry: {
+              coordinates: [127.72459494610746, 36.72507494392501],
+              type: "Point",
+            },
+          },
+          {
+            type: "Feature",
+            properties: {},
+            geometry: {
+              coordinates: [127.70069374990237, 36.10991249986158],
+              type: "Point",
+            },
+          },
         ],
-        "type": "Point"
-      }
+      };
     },
-    {
-      "type": "Feature",
-      "properties": {},
-      "geometry": {
-        "coordinates": [
-          127.70069374990237,
-          36.10991249986158
-        ],
-        "type": "Point"
-      }
-    }
-  ]
-};
-
-
-        },
-    }
-})
+  },
+});
 </script>

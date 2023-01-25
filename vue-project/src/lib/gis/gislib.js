@@ -8,6 +8,9 @@ import VectorLayer from 'ol/layer/Vector.js';
 import VectorSource from 'ol/source/Vector.js';
 import Overlay from 'ol/Overlay.js';
 
+import Feature from 'ol/Feature.js';
+
+
 import { Point,LineString ,Polygon} from 'ol/geom';
 
 // source
@@ -26,11 +29,15 @@ import {
 
 import {get, toLonLat} from 'ol/proj.js';
 
+// style
+import {Circle, Fill, Icon, Stroke, Style, Text} from 'ol/style.js';
+
 
 //etc
 import GeoJSON from 'ol/format/GeoJSON.js';
 import {WKT} from 'ol/format.js'
-
+import {bbox as bboxStrategy} from 'ol/loadingstrategy.js';
+import * as Extent from 'ol/extent'
 
 
 
@@ -120,7 +127,17 @@ const FeatureType = Object.freeze({
 
 
 
+/**
+ * 
+ * 
+ * 
+ 1. setMultiSelectOverlay : 멀티 선택시 
 
+
+
+
+
+ */
  class OGis{
 
     /// todo
@@ -137,17 +154,47 @@ const FeatureType = Object.freeze({
     overlayContainer=null;
     rasterLayers=[];
     createLayer=null;
-
     modify=null;
 
 
 
     // Overlay 객체 모음
-    MultiSelectOverlay = null;
+
+
+    /***** feature 선택시 *****/
+    /* 
+      (this,feature)
+    */
+
+    #defaultFeatureInfoViewCallback= (mapManager,feature)=>{
+      const container = document.createElement('div');
+      container.style.width='300px';
+      container.style.backgroundColor='#ff0000'
+      container.innerHTML=new WKT().writeGeometry(feature.getGeometry());
+     
+      return container;
+    }
+    #featureInfoViewCallback=this.#defaultFeatureInfoViewCallback;
+    // feature to Overlay,virtual Point
+    #featureInfoOverlayMap=new Map()
+    // featureInfo를 띄울 LineString 레이어
+    #featureInfoLayer = new VectorLayer({
+        source: new VectorSource(),
+        style: {
+            'fill-color': 'rgba(255, 0, 0, 0.9)',
+            'stroke-color': '#ff0000',
+            'stroke-width': 1,
+            'circle-radius': 7,
+            'circle-fill-color': '#ffcc33',
+          },
+          zIndex:100
+    });
 
 
 
-    /** MultiSelect 를 위한 */
+
+
+    /****************** MultiSelect 를 위한 *******************/
     // 디폴트 함수
     #defaultMultiSelectFunc = (mapManager,overlay,fectureList)=>{
         const container = document.createElement('div');
@@ -161,11 +208,17 @@ const FeatureType = Object.freeze({
           }
           return container;
     };
-    //
+    // 멀티선택시 콜백(ovelay 객체를 던진다.)
     multiSelectFunc=this.#defaultMultiSelectFunc;
 
+    // 멀티선택시 관리되는 Overlay 객체
+    MultiSelectOverlay = null;
 
-    /** feature 생성을 위한.. */ 
+
+
+
+
+    /***** feature 생성을 위한.. *****/ 
     createLayer=null;
     
 
@@ -173,19 +226,11 @@ const FeatureType = Object.freeze({
     constructor(target)
     {
 
-
-        var newDiv = document.createElement("div");
-        newDiv.style="display: none";
-        target.appendChild(newDiv);
-        this.overlayContainer=newDiv;
-
-
-
-
         this.target = target;
         this.init();
 
     }
+
 
     init()
     {
@@ -218,9 +263,14 @@ const FeatureType = Object.freeze({
         //// 다중 선택 초기화
         this.#initMultiSelect();
 
-
+        
+        /// 선택시 overlay layer
+        this.map.addLayer(this.#featureInfoLayer )
+       
         // 테스트
         this.test();
+
+  
          
     }
 
@@ -233,7 +283,7 @@ const FeatureType = Object.freeze({
             element: null,
             autoPan: {
               animation: {
-                duration: 250,
+                duration: 25,
               },
             },
           });
@@ -244,14 +294,21 @@ const FeatureType = Object.freeze({
         });
 
         multiSelect.on('select',event=>{
+          if(select.selected.length==0)
+          {
+            return ;
+          }
+
            let em = this.multiSelectFunc(this, this.MultiSelectOverlay,event.selected);
-           console.info(em)
            this.MultiSelectOverlay.setElement(em)
-           this.MultiSelectOverlay.setPosition(event.selected[0].getGeometry().getFirstCoordinate())
+           //this.MultiSelectOverlay.setPosition(event.selected[0].getGeometry().getFirstCoordinate())
+           this.MultiSelectOverlay.setPosition(event.mapBrowserEvent.map.getCoordinateFromPixel(event.mapBrowserEvent.pixel))
         })
 
         this.map.addInteraction(multiSelect)
     }
+
+    
 
 
     /// 다중 선택시 나오는 Overlay UI
@@ -263,6 +320,159 @@ const FeatureType = Object.freeze({
     {
         this.multiSelectFunc = func;
     }
+
+
+
+    /**
+     * feature의 정보뷰를 보인다.
+     * 
+     * @param {Feature} feature 
+     * @param {Coordinate , undefined} position 
+     */
+
+    infoViewOn(feature,position){
+     
+/*
+      virtualPoint.setStyle(
+        new Style({
+          fill: new Fill({
+            color: "orange"
+          }),
+          stroke: new Stroke({
+            color:"orange",
+            width: 4,
+          }),
+          geometry: function(vfeature) {
+            // return the coordinates of the first ring of the polygon
+            var geometries = [];
+            const endP=vfeature.getGeometry().getFirstCoordinate();
+            const  startP=feature.getGeometry().getFirstCoordinate();
+            geometries.push(startP)
+            geometries.push(endP)
+            console.info(new LineString(geometries))
+            return new LineString(geometries);
+          }
+        })
+      );
+      */
+      const virtualPoint = new Feature({
+        geometry: new LineString([  feature.getGeometry().getFirstCoordinate()   , [ 127.00494823457324,
+          37.006669269068114]]),
+      });
+
+      this.#featureInfoLayer.getSource().addFeature(virtualPoint)
+      
+
+
+      if(position===undefined)
+      {
+        position=virtualPoint.getGeometry().getLastCoordinate()
+      }
+    
+
+      const view= this.#featureInfoViewCallback(this,feature);
+      const overlay =  new Overlay({
+        element: view,
+        position:position,
+        positioning:'bottom-center',
+        autoPan: {
+          animation: {
+            duration: 250,
+          },
+        },
+      });
+
+      this.#featureInfoOverlayMap.set(feature,overlay)
+      this.map.addOverlay(overlay);
+
+
+
+
+
+
+      const draggable = ($target) => {
+        let isPress = false,
+            prevPosX = 0,
+            prevPosY = 0,
+            preCoo =null
+            ;
+
+      
+        
+        $target.onmousedown = start;
+        $target.onmouseup = end;
+          
+        // 상위 영역
+       // window.onmousemove = move;
+       this.map.on('pointermove',(e)=>{
+        if (!isPress) return;
+          if(preCoo===null)
+          {
+            console.info("preCoo"+e.coordinate)
+            preCoo=e.coordinate;
+          }
+
+
+        const posX = preCoo[0] - e.coordinate[0]; 
+        const posY = preCoo[1] - e.coordinate[1]; 
+       
+       
+        overlay.getPosition()[0]-posX;
+        overlay.setPosition([
+          overlay.getPosition()[0]-posX,
+          overlay.getPosition()[1]-posY,
+        ])
+
+        console.info(virtualPoint.getGeometry())
+        virtualPoint.getGeometry().setCoordinates(
+          [virtualPoint.getGeometry().getCoordinates()[0],
+          [
+            virtualPoint.getGeometry().getCoordinates()[1][0]-posX,
+            virtualPoint.getGeometry().getCoordinates()[1][1]-posY,
+          ]
+        ]
+        )
+        preCoo = e.coordinate
+
+       })
+       
+        function start(e) {
+          prevPosX = e.clientX;
+          prevPosY = e.clientY;
+         // preCoo=virtualPoint.getGeometry().getLastCoordinate();
+      
+          isPress = true;
+        }
+      
+        function move(e) {
+          if (!isPress) return;
+      
+          const posX = prevPosX - e.clientX; 
+          const posY = prevPosY - e.clientY; 
+          
+          prevPosX = e.clientX; 
+          prevPosY = e.clientY;
+
+          /*virtualPoint.setGeometry([virtualPoint.getGeometry().getFirstCoordinate()
+          ,
+          ])*/
+          
+          $target.style.left = ($target.offsetLeft - posX) + "px";
+          $target.style.top = ($target.offsetTop - posY) + "px";
+        }
+      
+        function end() {
+          isPress = false;
+          preCoo=null
+        }
+      }
+
+      draggable(view)
+
+
+    }
+
+
 
 
 
@@ -286,9 +496,15 @@ const FeatureType = Object.freeze({
     
 
 
+        addVectorLayer(layer)
+        {
+          this.map.addLayer(layer)
+    
+        }
 
 
-   
+
+
 
 
 
@@ -356,7 +572,22 @@ const FeatureType = Object.freeze({
                   ],
                   "type": "Point"
                 }
-              }
+              },
+              {
+                "type": "Feature",
+                "properties": {},
+                "geometry": {
+                  "coordinates": [
+                    [126.75186297386847,
+                    37.42218873353694]
+                    ,[ 127.02348178970817,
+                      37.281651559236025]
+                      ,[ 126.00048178970817,
+                        37.271651559236025]
+                  ],
+                  "type": "LineString"
+                }
+              },
             ]
           };
 
@@ -395,8 +626,6 @@ const FeatureType = Object.freeze({
                newDiv.style.width = "300px";
                newDiv.style.height = "300px";
                 
-
-               console.info(this.overlayContainer)
                const overlay = new Overlay({
                 element: newDiv,
                 autoPan: {
@@ -416,15 +645,18 @@ const FeatureType = Object.freeze({
           
             const ft= e.selected[0];
             console.info(ft)
-            console.info( ft.getGeometry())
+          
            let firstCoordinate =  ft.getGeometry().getFirstCoordinate()
-           console.info(firstCoordinate)
-            overlay.setPosition(firstCoordinate);
+           const centerPoint = ft.getGeometry().getCenter();
+           console.info( "center"+centerPoint)
+           console.info(centerPoint)
+
+
+            overlay.setPosition(centerPoint);
 
           });
 
-     
-
+          this.infoViewOn(geojsonSource.getFeatures()[5]);
     }
 
     /**
