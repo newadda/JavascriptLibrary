@@ -218,6 +218,29 @@ const FeatureType = Object.freeze({
 
 
 
+    /************* 연결 된 정보 뷰 *************/
+    // featureInfo를 띄울 LineString 레이어
+    _connectFeatureInfoLayer = new VectorLayer({
+      source: new VectorSource(),
+      style: {
+          'fill-color': 'rgba(255, 0, 0, 0.2)',
+          'stroke-color': 'rgba(255, 0, 0, 0.2)',
+          'stroke-width': 1,
+          'circle-radius': 7,
+          'circle-fill-color': '#ffcc33',
+        },
+        zIndex:100
+    });
+    get connectFeatureInfoLayer() {
+      return this._connectFeatureInfoLayer;
+    }
+
+
+
+
+
+
+
     /***** feature 생성을 위한.. *****/ 
     createLayer=null;
     
@@ -267,6 +290,11 @@ const FeatureType = Object.freeze({
         /// 선택시 overlay layer
         this.map.addLayer(this.#featureInfoLayer )
        
+
+        /// 연결 정보 보여주기용 Layer
+        this.map.addLayer(this._connectFeatureInfoLayer )
+
+
         // 테스트
         this.test();
 
@@ -320,6 +348,135 @@ const FeatureType = Object.freeze({
     {
         this.multiSelectFunc = func;
     }
+
+
+    list = [];
+    connectInfoViewOn(feature,view)
+    {  
+      //console.log(feature);
+       this.list.push(feature)
+       if(this.list.length>1)
+        return
+
+        while(this.list.length>0)
+        {
+         const element =  this.list.shift()
+          console.log("for   === "+ element);
+          this._connectInfoViewOn(feature,view)
+        
+        }
+
+    
+     
+    }
+
+    /**
+     * 연결 된 정보 뷰
+     */
+  
+    _connectInfoViewOn(feature,view)
+    {
+    
+      const originPosition = feature.getGeometry().getFirstCoordinate();
+      
+      // 띄울 좌표
+      const pixel = this.map.getPixelFromCoordinate(originPosition);
+      pixel[0]-=5;
+      pixel[1]-=5;
+      const floatingCoordinate= this.map.getCoordinateFromPixel(pixel);
+
+
+      const virtualLineString = new Feature({
+        geometry: new LineString([ 
+          originPosition ,floatingCoordinate]),
+      });
+
+ 
+      this.connectFeatureInfoLayer.getSource().addFeature(virtualLineString)
+
+
+      let position;
+      if(position===undefined)
+      {
+         position=virtualLineString.getGeometry().getLastCoordinate()
+      }
+
+      const overlay =  new Overlay({
+        element: view,
+        position:position,
+        positioning:'bottom-center',
+        autoPan: {
+          animation: {
+            duration: 20,
+          },
+        },
+      });
+
+
+      this.map.addOverlay(overlay);
+
+      const draggable = ($target) => {
+        let isPress = false,
+            preCoo =null
+            ;
+
+        $target.onmousedown = start;
+        $target.onmouseup = end;
+       // $target.onmouseout = end;
+          
+        // 상위 영역
+       // window.onmousemove = move;
+       this.map.on('pointermove',(e)=>{
+        if (!isPress) return;
+          if(preCoo===null)
+          {
+            preCoo=e.coordinate;
+          }
+
+        const deletaX = preCoo[0] - e.coordinate[0]; 
+        const deletaY = preCoo[1] - e.coordinate[1]; 
+       
+       console.info(deletaX+deletaY)
+
+       const movedX =  overlay.getPosition()[0]-deletaX;
+       const movedY = overlay.getPosition()[1]-deletaY;
+
+        overlay.setPosition([
+          movedX,
+          movedY,
+        ])
+
+        virtualLineString.getGeometry().setCoordinates(
+          [virtualLineString.getGeometry().getFirstCoordinate(),
+          [
+            movedX, movedY
+          ]
+        ]
+        )
+        preCoo = e.coordinate
+
+       })
+       
+        function start(e) {
+    
+          isPress = true;
+        }
+  
+        function end() {
+          
+          isPress = false;
+          preCoo=null
+        }
+      }
+
+      draggable(view)
+
+    }
+
+
+
+
+
 
 
 

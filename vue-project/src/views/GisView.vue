@@ -36,7 +36,7 @@ export default defineComponent({
         return (
           "http://127.0.0.1:8081/geoserver/waterworks/ows?service=WFS&" +
           "version=1.1.0&request=GetFeature&typeName=waterworks:FTR_WTL_PIPE_LM&" +
-          "outputFormat=application/json&srsname=EPSG:4326&maxFeatures=10000&" +
+          "outputFormat=application/json&srsname=EPSG:4326&maxFeatures=30&" +
           "bbox=" +
           extent.join(",") +
           ",EPSG:4326"
@@ -75,6 +75,26 @@ export default defineComponent({
     this.ogis = ogis;
 
     this.ogis.addVectorLayer(pipeVector);
+
+    let is=false;
+    pipeSource.on('addfeature',e=>{
+      //if(is==true)
+     // return 
+     
+      const container =document.createElement('div');
+      container.style.width='300px';
+      container.style.backgroundColor='#ff0000'
+      container.innerHTML='222222222222222222222222222222222';
+
+    this.ogis.connectInfoViewOn(e.feature,container)
+    is=true;
+
+    })
+
+  
+    
+
+
   },
   methods: {
     modi() {
