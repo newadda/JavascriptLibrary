@@ -43,7 +43,6 @@ class Line{
             console.info(point)
             if(i===0)
             {
-                
                 ctx.moveTo(point.x, point.y)
                 i++;
             }else{
