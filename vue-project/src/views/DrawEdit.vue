@@ -1,7 +1,12 @@
 <template>
-  <div >
- 
-    <canvas ref="can" style="width: 500px; height: 500px"></canvas>
+  <div>
+    <div  style="width: 500px; height: 500px ; position:relative">
+     <!-- <div style="position:absolute;width:10px;height:10px;border-radius:50%;background-color:red;top:10px;left:200px"></div>-->
+    </div>
+    <div   ref="container" style="width: 500px; height: 500px ; position:relative">
+            <canvas ref="can" style="width: 500px; height: 500px;position:absolute">    </canvas>
+    </div>
+
   </div>
 </template>
 
@@ -19,13 +24,17 @@ class Point{
 
 class Line{
     printList = [];
+    isEdit=false;
+
     constructor(){
         this.printList.push(new Point(12,12));
         this.printList.push(new Point(20,20));
         this.printList.push(new Point(30,30));
+        this.isEdit=false;
     }
 
-    draw(canvas){
+
+     draw(canvas){
         const ctx = canvas.getContext("2d");
         
         let i=0;
@@ -44,7 +53,32 @@ class Line{
         ctx.lineWidth = 1;
         ctx.strokeStyle = 'blue';
         ctx.stroke();
-       
+
+/*
+        if(this.isEdit==false)
+        {
+          retrun ;
+        }*/
+        for(let point of this.printList)
+        {
+          const temp = document.createElement("div");
+          temp.style="position:absolute;width:10px;height:10px;border-radius:50%;background-color:black"
+          //temp.textContent=point
+          //temp.innerHTML = '<div></div>'
+         // temp.style.width = "10px";
+          //temp.style.height = "10px";
+         // temp.style.background-color = "black";
+          temp.style.position = "absolute";
+          temp.style.top=point.y+'px';
+          temp.style.left=point.x+'px';
+          canvas.parentElement.appendChild(temp)
+
+          console.info(temp)
+  
+        }
+
+
+
     }
 }
 
