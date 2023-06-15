@@ -322,11 +322,11 @@ const FeatureType = Object.freeze({
         });
 
         multiSelect.on('select',event=>{
-          if(select.selected.length==0)
+          if(event.selected.length==0)
           {
             return ;
           }
-
+       
            let em = this.multiSelectFunc(this, this.MultiSelectOverlay,event.selected);
            this.MultiSelectOverlay.setElement(em)
            //this.MultiSelectOverlay.setPosition(event.selected[0].getGeometry().getFirstCoordinate())

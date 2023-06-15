@@ -3,6 +3,7 @@
     <button @click="modi">수정</button>
     <div ref="map" style="width: 100%; height: 800px"></div>
   </div>
+  <MultipleSelectMenu ref="msm"></MultipleSelectMenu>
 </template>
 
 <script>
@@ -19,7 +20,13 @@ import { bbox as bboxStrategy } from "ol/loadingstrategy.js";
 // style
 import { Circle, Fill, Icon, Stroke, Style, Text } from "ol/style.js";
 
+
+
+import {WKT} from 'ol/format.js'
+import MultipleSelectMenu from "@/lib/gis/waterworks/MultipleSelectMenu.vue"
+
 export default defineComponent({
+  components:{MultipleSelectMenu},
   setup() {},
   data() {
     return {
@@ -29,6 +36,8 @@ export default defineComponent({
   mounted() {
     test();
     let ogis = new OGis(this.$refs.map);
+
+ 
 
     const pipeSource = new VectorSource({
       format: new GeoJSON(),
@@ -91,6 +100,8 @@ export default defineComponent({
 
     })
 
+
+    
   
     
 
