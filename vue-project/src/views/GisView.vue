@@ -24,6 +24,7 @@ import { Circle, Fill, Icon, Stroke, Style, Text } from "ol/style.js";
 
 import {WKT} from 'ol/format.js'
 import MultipleSelectMenu from "@/lib/gis/waterworks/MultipleSelectMenu.vue"
+import { createApp } from 'vue'
 
 export default defineComponent({
   components:{MultipleSelectMenu},
@@ -37,7 +38,22 @@ export default defineComponent({
     test();
     let ogis = new OGis(this.$refs.map);
 
- 
+    /// 여러개 선택시 오버레이 설정 테스트
+    ogis.setMultiSelectOverlay((mapManager,overlay,fectureList)=>{
+        const container = document.createElement('div');
+        container.style.width='300px';
+        container.style.backgroundColor='#ff00ff'
+        for (const feature of fectureList) {
+            let child = document.createElement('div')
+            createApp(MultipleSelectMenu).mount(child)
+            //child.innerHTML=;
+            child.onclick=()=>{ overlay.setPosition(undefined);}
+            container.appendChild(child)
+          }
+          return container;
+    })
+
+
 
     const pipeSource = new VectorSource({
       format: new GeoJSON(),
