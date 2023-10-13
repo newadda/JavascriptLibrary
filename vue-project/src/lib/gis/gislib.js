@@ -640,8 +640,11 @@ const FeatureType = Object.freeze({
      */
         newFeatureDrawOn(featureMode)
         {
+      
             this.map.addLayer(this.createLayer);
-            this.#drawAble(FeatureType, this.createLayer.getSource())
+        
+            this.drawAble(featureMode, this.createLayer.getSource())
+            return ;
         }
         /**
          *  @param {Object} interactions - {draw:draw,modify:modify,snap:snap}
@@ -860,9 +863,11 @@ const FeatureType = Object.freeze({
     /**
      * 
      */
-    #drawAble(featureMode,source)
+    drawAble(featureMode,source)
     {
+  
         let featureType=featureMode;
+       
         let geometryFunction;
         if(featureType===FeatureType.PolygonBox)
         {

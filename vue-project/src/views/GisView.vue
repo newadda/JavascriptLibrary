@@ -125,7 +125,7 @@ export default defineComponent({
   },
   methods: {
     modi() {
-      this.ogis.modifyFeature();
+      this.ogis.newFeatureDrawOn(FeatureType.LineString);
     },
     abti() {
       let geojson = {
