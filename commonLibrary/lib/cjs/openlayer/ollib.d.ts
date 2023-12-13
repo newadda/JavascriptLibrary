@@ -32,8 +32,12 @@ declare class OGIS {
     multiSelectContainer: MultiSelectContainer;
     multiSelectListener?: MultiSelectListener;
     private overlayManager?;
+    private _stayInfoViewMap;
+    private connectFeatureInfoLayer;
     constructor(target: Element, options?: OGISProperty);
-    init(options: OGISProperty): void;
+    private init;
+    initConnectInfoView(): void;
+    connectInfoViewOn(feature: Feature, view: HTMLElement): void;
     test(): void;
 }
 export { OGIS };

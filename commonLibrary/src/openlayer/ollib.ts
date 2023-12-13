@@ -8,10 +8,10 @@ import VectorLayer from 'ol/layer/Vector.js';
 import VectorSource from 'ol/source/Vector.js';
 import Overlay from 'ol/Overlay.js';
 
-import Feature from 'ol/Feature.js';
+import Feature, { FeatureLike } from 'ol/Feature.js';
 import Geometry from"ol/geom/Geometry.js"
 
-import { Point,LineString ,Polygon} from 'ol/geom';
+import { Point,LineString ,Polygon, SimpleGeometry} from 'ol/geom';
 
 
 // source
@@ -39,6 +39,9 @@ import GeoJSON from 'ol/format/GeoJSON.js';
 import {WKT} from 'ol/format.js'
 import {bbox as bboxStrategy} from 'ol/loadingstrategy.js';
 import * as Extent from 'ol/extent'
+import Layer from 'ol/layer/Layer';
+import BaseVectorLayer from 'ol/layer/BaseVector';
+import { Coordinate } from 'ol/coordinate';
 
 
 ////////// Utils
@@ -182,6 +185,24 @@ class OGIS{
     private overlayManager?:OverlayManager; // 멀티셀렉트 매니저
 
 
+    //// 가상뷰, 떠있는 정보뷰를 위한
+    private _stayInfoViewMap=new Map()
+    private connectFeatureInfoLayer:VectorLayer<VectorSource>=new VectorLayer({
+      source: new VectorSource(),
+      style: {
+        'fill-color': 'rgba(255, 0, 0, 0.2)',
+        'stroke-color': 'rgba(255, 0, 0, 0.2)',
+        'stroke-width': 1,
+        'circle-radius': 7,
+        'circle-fill-color': '#ffcc33',
+        },
+        zIndex:100
+  });
+  
+
+
+
+
 
     constructor(target:Element,options:OGISProperty=new OGISProperty())
     {
@@ -189,11 +210,14 @@ class OGIS{
         this._targetElement = target;
         this.init(options)
         this.#initMultiSelect()
+        this.initConnectInfoView()
     }
 
-    init(options:OGISProperty){
+    private init(options:OGISProperty){
         Object.assign(options,new OGISProperty())
         this._mapView = new View(options as any);
+
+       
 
           // 범위지정
           const extent = get(this._mapView.getProjection())?.getExtent().slice();
@@ -250,6 +274,179 @@ class OGIS{
       })
 
       this._map!.addInteraction(multiSelect)
+    }
+
+
+
+    /*  ===================== 계속 존재하는 정보뷰 ======================== */
+    initConnectInfoView()
+    {
+      this._map!.addLayer(this.connectFeatureInfoLayer)
+    }
+
+   
+
+    connectInfoViewOn(feature:Feature ,viewCreater:(feature:Feature)=>HTMLElement)
+    {
+      const view = viewCreater(feature)
+
+      
+      const geometry = feature.getGeometry() as SimpleGeometry
+      const originPosition = geometry.getFirstCoordinate();
+
+      // 띄울 좌표
+      let pixel = this._map!.getPixelFromCoordinate(originPosition);
+      let floatingCoordinate = originPosition
+      if(pixel)
+      {
+        pixel[0]-=5;
+        pixel[1]-=5;
+        floatingCoordinate= this._map!.getCoordinateFromPixel(pixel);
+      }
+
+      const virtualLineString = new Feature({
+        geometry: new LineString([ 
+          originPosition ,floatingCoordinate]),
+      });
+
+      this.connectFeatureInfoLayer.getSource()?.addFeature(virtualLineString)
+
+      let position;
+      if(position===undefined)
+      {
+         position=virtualLineString.getGeometry()!.getLastCoordinate()
+      }
+
+
+
+
+      const overlay:Overlay =  new Overlay({
+        element: view,
+        position:position,
+        positioning:'bottom-center',
+        autoPan: {
+          animation: {
+            duration: 250,
+          },
+        },
+      });
+
+      
+      this._map?.addOverlay(overlay);
+
+      const superMap=this._map!
+
+      const draggable = ($target) => {
+        let isPress = false,
+            preCoo:Coordinate|null =null
+            ;
+
+        $target.onmousedown = start;
+        $target.onmouseup = end;
+        $target.onmouseout = end;
+          
+        // 상위 영역
+       // window.onmousemove = move;
+       superMap.on('pointermove',(e)=>{
+        if (!isPress) return;
+          if(preCoo===null)
+          {
+            preCoo=e.coordinate;
+          }
+
+        const deletaX = preCoo[0] - e.coordinate[0]; 
+        const deletaY = preCoo[1] - e.coordinate[1]; 
+       
+       console.info(deletaX+deletaY)
+       const overlayPosition = overlay.getPosition()!
+       const movedX =  overlayPosition[0]-deletaX;
+       const movedY = overlayPosition[1]-deletaY;
+
+        overlay.setPosition([
+          movedX,
+          movedY,
+        ])
+
+        virtualLineString.getGeometry()!.setCoordinates(
+          [virtualLineString.getGeometry()!.getFirstCoordinate(),
+          [
+            movedX, movedY
+          ]
+        ]
+        )
+        preCoo = e.coordinate
+
+       })
+       
+        function start(e) {
+    
+          isPress = true;
+        }
+  
+        function end() {
+          
+          isPress = false;
+          preCoo=null
+        }
+      }
+
+      draggable(view)
+
+      /// feature 좌표 변경에 대해 연결된 정보뷰의 라인도 움직이게 한다.
+      feature.on("change",e=>{
+        console.log("change",e)
+        virtualLineString.getGeometry()!.setCoordinates(
+          [e.target.getGeometry().getFirstCoordinate(),
+            virtualLineString.getGeometry()!.getLastCoordinate()
+        ]
+        )
+
+      })
+
+    }
+
+
+
+
+    /* ========================= 편집 기능 =========================== */
+    /// 생성기능
+    drawAble(featureMode,source)
+    {
+  
+        let featureType=featureMode;
+       
+        let geometryFunction;
+        if(featureType===FeatureType.PolygonBox)
+        {
+            featureType='Circle';
+            geometryFunction=createBox();
+        }
+
+        const modify= new Modify({source: source});
+        this._map!.addInteraction(modify);
+
+        const draw = new Draw({
+            source: source,
+            type: featureType,
+            geometryFunction: geometryFunction,
+          });
+          this._map!.addInteraction( draw );
+    
+        const snap = new Snap({source: source});
+        this._map!.addInteraction( snap);
+
+        return {draw:draw,modify:modify,snap:snap}
+    }
+
+
+
+
+    /// 생성기능 끄기
+    disableDrawAndModify(interactions)
+    {
+      this._map!.removeInteraction(interactions.draw);
+      this._map!.removeInteraction(interactions.modify);
+      this._map!.removeInteraction(interactions.snap);
     }
 
 
@@ -365,7 +562,48 @@ class OGIS{
         });
 
 
-        this._map!.addLayer(layerVector);
+    
+       
+        
+        const a =  geojsonSource.getFeatures()[0]
+        this.connectInfoViewOn(a as Feature,(f)=>{
+
+          this._map!.addLayer(layerVector);
+          const container = document.createElement('div');
+          container.style.width='300px';
+          container.style.backgroundColor='#ff0000'
+          container.innerHTML="test";
+          return container;
+
+        })
+        const b =  geojsonSource.getFeatures()[1]
+        this.connectInfoViewOn(b as Feature,(f)=>{
+
+          this._map!.addLayer(layerVector);
+          const container = document.createElement('div');
+          container.style.width='300px';
+          container.style.backgroundColor='#ff0000'
+          container.innerHTML="test";
+          return container;
+
+        })
+        let geometryFunction;
+      
+
+        const modify= new Modify({source: geojsonSource as VectorSource});
+        this._map?.addInteraction(modify);
+
+       /* const draw = new Draw({
+            source: geojsonSource as VectorSource,
+            type: FeatureType.Point,
+            geometryFunction: geometryFunction,
+          });
+          this._map?.addInteraction( draw );
+    */
+        const snap = new Snap({source: geojsonSource as VectorSource});
+        this._map?.addInteraction( snap);
+
+
     }
 }
 
