@@ -15,8 +15,9 @@ import Feature from 'ol/Feature.js';
 import { Point, LineString } from 'ol/geom';
 import OSM from 'ol/source/OSM.js';
 // interaction
-import { Modify, Snap } from 'ol/interaction.js';
+import { Draw, Modify, Snap } from 'ol/interaction.js';
 import Select from 'ol/interaction/Select.js';
+import { createBox, } from 'ol/interaction/Draw.js';
 import { get } from 'ol/proj.js';
 // style
 import { Circle, Fill, Stroke, Style } from 'ol/style.js';
@@ -109,6 +110,7 @@ const defaultMultiSelectContainer = (overlayManager, featureList) => {
     const container = document.createElement('div');
     container.style.width = '300px';
     container.style.backgroundColor = '#ff00ff';
+    console.log("featureList", featureList);
     for (const feature of featureList) {
         let child = document.createElement('div');
         const geometry = feature.getGeometry();
@@ -164,9 +166,9 @@ class OGIS {
     initConnectInfoView() {
         this._map.addLayer(this.connectFeatureInfoLayer);
     }
-    connectInfoViewOn(feature, view) {
+    connectInfoViewOn(feature, viewCreater) {
         var _a, _b;
-        const viewClone = view.cloneNode(true);
+        const view = viewCreater(feature);
         const geometry = feature.getGeometry();
         const originPosition = geometry.getFirstCoordinate();
         // 띄울 좌표
@@ -188,7 +190,7 @@ class OGIS {
             position = virtualLineString.getGeometry().getLastCoordinate();
         }
         const overlay = new Overlay({
-            element: viewClone,
+            element: view,
             position: position,
             positioning: 'bottom-center',
             autoPan: {
@@ -236,7 +238,7 @@ class OGIS {
                 preCoo = null;
             }
         };
-        draggable(viewClone);
+        draggable(view);
         /// feature 좌표 변경에 대해 연결된 정보뷰의 라인도 움직이게 한다.
         feature.on("change", e => {
             console.log("change", e);
@@ -245,8 +247,35 @@ class OGIS {
             ]);
         });
     }
+    /* ========================= 편집 기능 =========================== */
+    /// 생성기능
+    drawAble(featureMode, source) {
+        let featureType = featureMode;
+        let geometryFunction;
+        if (featureType === FeatureType.PolygonBox) {
+            featureType = 'Circle';
+            geometryFunction = createBox();
+        }
+        const modify = new Modify({ source: source });
+        this._map.addInteraction(modify);
+        const draw = new Draw({
+            source: source,
+            type: featureType,
+            geometryFunction: geometryFunction,
+        });
+        this._map.addInteraction(draw);
+        const snap = new Snap({ source: source });
+        this._map.addInteraction(snap);
+        return { draw: draw, modify: modify, snap: snap };
+    }
+    /// 생성기능 끄기
+    disableDrawAndModify(interactions) {
+        this._map.removeInteraction(interactions.draw);
+        this._map.removeInteraction(interactions.modify);
+        this._map.removeInteraction(interactions.snap);
+    }
     test() {
-        var _a, _b, _c;
+        var _a;
         (_a = this._map) === null || _a === void 0 ? void 0 : _a.addLayer(new TileLayer({ source: new OSM() }));
         let geojson = {
             "type": "FeatureCollection",
@@ -349,17 +378,25 @@ class OGIS {
             },
         });
         this._map.addLayer(layerVector);
-        const container = document.createElement('div');
-        container.style.width = '300px';
-        container.style.backgroundColor = '#ff0000';
-        container.innerHTML = "test";
         const a = geojsonSource.getFeatures()[0];
-        this.connectInfoViewOn(a, container);
+        this.connectInfoViewOn(a, (f) => {
+            const container = document.createElement('div');
+            container.style.width = '300px';
+            container.style.backgroundColor = '#ff0000';
+            container.innerHTML = "test";
+            return container;
+        });
         const b = geojsonSource.getFeatures()[1];
-        this.connectInfoViewOn(b, container);
+        this.connectInfoViewOn(b, (f) => {
+            const container = document.createElement('div');
+            container.style.width = '300px';
+            container.style.backgroundColor = '#ff0000';
+            container.innerHTML = "test";
+            return container;
+        });
         let geometryFunction;
         const modify = new Modify({ source: geojsonSource });
-        (_b = this._map) === null || _b === void 0 ? void 0 : _b.addInteraction(modify);
+        //this._map?.addInteraction(modify);
         /* const draw = new Draw({
              source: geojsonSource as VectorSource,
              type: FeatureType.Point,
@@ -368,7 +405,7 @@ class OGIS {
            this._map?.addInteraction( draw );
      */
         const snap = new Snap({ source: geojsonSource });
-        (_c = this._map) === null || _c === void 0 ? void 0 : _c.addInteraction(snap);
+        //this._map?.addInteraction( snap);
     }
 }
 _OGIS_instances = new WeakSet(), _OGIS_initMultiSelect = function _OGIS_initMultiSelect() {
@@ -390,6 +427,7 @@ _OGIS_instances = new WeakSet(), _OGIS_initMultiSelect = function _OGIS_initMult
     });
     multiSelect.on('select', event => {
         var _a, _b, _c;
+        console.log("event.selected", event.selected);
         if (event.selected.length == 0) {
             (_a = this.multiSelectOverlay) === null || _a === void 0 ? void 0 : _a.setPosition(undefined);
             return;

@@ -1,5 +1,6 @@
 import Overlay from 'ol/Overlay.js';
 import Feature from 'ol/Feature.js';
+import { Draw, Modify, Snap } from 'ol/interaction.js';
 declare class OGISProperty {
     center: any[2];
     zoom: Number;
@@ -37,7 +38,13 @@ declare class OGIS {
     constructor(target: Element, options?: OGISProperty);
     private init;
     initConnectInfoView(): void;
-    connectInfoViewOn(feature: Feature, view: HTMLElement): void;
+    connectInfoViewOn(feature: Feature, viewCreater: (feature: Feature) => HTMLElement): void;
+    drawAble(featureMode: any, source: any): {
+        draw: Draw;
+        modify: Modify;
+        snap: Snap;
+    };
+    disableDrawAndModify(interactions: any): void;
     test(): void;
 }
 export { OGIS };

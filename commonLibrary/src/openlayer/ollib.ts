@@ -154,6 +154,7 @@ const defaultMultiSelectContainer:MultiSelectContainer = (overlayManager:Overlay
   const container = document.createElement('div');
   container.style.width='300px';
   container.style.backgroundColor='#ff00ff'
+  console.log("featureList",featureList)
   for (const feature of featureList) {
       
       let child = document.createElement('div')
@@ -260,7 +261,8 @@ class OGIS{
       });
 
       multiSelect.on('select',event=>{
-    
+        console.log("event.selected",event.selected)
+
         if(event.selected.length==0)
         {
           this.multiSelectOverlay?.setPosition(undefined)
@@ -563,12 +565,14 @@ class OGIS{
 
 
     
-       
+        this._map!.addLayer(layerVector);
+
+
         
         const a =  geojsonSource.getFeatures()[0]
         this.connectInfoViewOn(a as Feature,(f)=>{
 
-          this._map!.addLayer(layerVector);
+        
           const container = document.createElement('div');
           container.style.width='300px';
           container.style.backgroundColor='#ff0000'
@@ -579,7 +583,7 @@ class OGIS{
         const b =  geojsonSource.getFeatures()[1]
         this.connectInfoViewOn(b as Feature,(f)=>{
 
-          this._map!.addLayer(layerVector);
+         
           const container = document.createElement('div');
           container.style.width='300px';
           container.style.backgroundColor='#ff0000'
@@ -591,7 +595,7 @@ class OGIS{
       
 
         const modify= new Modify({source: geojsonSource as VectorSource});
-        this._map?.addInteraction(modify);
+        //this._map?.addInteraction(modify);
 
        /* const draw = new Draw({
             source: geojsonSource as VectorSource,
@@ -601,7 +605,7 @@ class OGIS{
           this._map?.addInteraction( draw );
     */
         const snap = new Snap({source: geojsonSource as VectorSource});
-        this._map?.addInteraction( snap);
+        //this._map?.addInteraction( snap);
 
 
     }
