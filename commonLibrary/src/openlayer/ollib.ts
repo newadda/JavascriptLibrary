@@ -345,8 +345,9 @@ class OGIS{
 
         $target.onmousedown = start;
         $target.onmouseup = end;
-        $target.onmouseout = end;
-          
+       // $target.onmouseout = end;
+        
+
         // 상위 영역
        // window.onmousemove = move;
        superMap.on('pointermove',(e)=>{
