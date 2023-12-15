@@ -5,7 +5,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 };
 var _OGIS_instances, _OGIS_initMultiSelect;
 //base
-import Map from 'ol/Map';
+import OlMap from 'ol/Map';
 import View from 'ol/View';
 import TileLayer from 'ol/layer/Tile';
 import VectorLayer from 'ol/layer/Vector.js';
@@ -20,7 +20,7 @@ import Select from 'ol/interaction/Select.js';
 import { createBox, } from 'ol/interaction/Draw.js';
 import { get } from 'ol/proj.js';
 // style
-import { Circle, Fill, Stroke, Style } from 'ol/style.js';
+import { Circle, Fill, Stroke, Style, Text } from 'ol/style.js';
 //etc
 import GeoJSON from 'ol/format/GeoJSON.js';
 import { WKT } from 'ol/format.js';
@@ -122,13 +122,16 @@ const defaultMultiSelectContainer = (overlayManager, featureList) => {
     }
     return container;
 };
+class ConnectInfoViewData {
+}
 class OGIS {
     constructor(target, options = new OGISProperty()) {
         _OGIS_instances.add(this);
         //// 멀티셀렉트
         this.multiSelectContainer = defaultMultiSelectContainer; // 멀티셀렉트시 생성 UI
         //// 가상뷰, 떠있는 정보뷰를 위한
-        this._stayInfoViewMap = new Map();
+        this.connectFeatureInfoHash = new Map();
+        this._stayInfoViewMap = new OlMap();
         this.connectFeatureInfoLayer = new VectorLayer({
             source: new VectorSource(),
             style: {
@@ -156,7 +159,7 @@ class OGIS {
             extent[2] += extent[2];
         }
         // 맵 만들기
-        this._map = new Map({
+        this._map = new OlMap({
             target: this._targetElement,
             layers: [new TileLayer({ source: new OSM() })],
             view: this._mapView,
@@ -246,10 +249,26 @@ class OGIS {
                 virtualLineString.getGeometry().getLastCoordinate()
             ]);
         });
+        const data = new ConnectInfoViewData();
+        data.virtualFeature = virtualLineString;
+        data.overLay = overlay;
+        this.connectFeatureInfoHash.set(feature, data);
+    }
+    connectInfoViewOff(feature) {
+        var _a, _b;
+        const data = this.connectFeatureInfoHash.get(feature);
+        if (data) {
+            if (data.overLay) {
+                (_a = this._map) === null || _a === void 0 ? void 0 : _a.removeOverlay(data.overLay);
+            }
+            if (data.virtualFeature) {
+                (_b = this.connectFeatureInfoLayer.getSource()) === null || _b === void 0 ? void 0 : _b.removeFeature(data.virtualFeature);
+            }
+        }
     }
     /* ========================= 편집 기능 =========================== */
     /// 생성기능
-    drawAble(featureMode, source) {
+    onDrawable(featureMode, source) {
         let featureType = featureMode;
         let geometryFunction;
         if (featureType === FeatureType.PolygonBox) {
@@ -275,7 +294,7 @@ class OGIS {
         this._map.removeInteraction(interactions.snap);
     }
     test() {
-        var _a;
+        var _a, _b;
         (_a = this._map) === null || _a === void 0 ? void 0 : _a.addLayer(new TileLayer({ source: new OSM() }));
         let geojson = {
             "type": "FeatureCollection",
@@ -369,13 +388,26 @@ class OGIS {
         console.info(geojsonSource.getFeatures());
         const layerVector = new VectorLayer({
             source: geojsonSource,
-            style: {
-                'fill-color': 'rgba(255, 255, 255, 0.2)',
-                'stroke-color': '#ffcc33',
-                'stroke-width': 2,
-                'circle-radius': 7,
-                'circle-fill-color': '#ff0000',
-            },
+            style: new Style({
+                stroke: new Stroke({
+                    color: '#ffcc33',
+                    width: 2,
+                }),
+                text: new Text({
+                    textAlign: "center",
+                    textBaseline: "middle",
+                    font: "Blod" + " " + "30px" + "/" + 3 + " " + "arial",
+                    text: "111111111111111",
+                    fill: new Fill({ color: "blue" }),
+                    stroke: new Stroke({ color: "0xff00ff", width: 3.0 }),
+                    offsetX: 0,
+                    offsetY: 0,
+                    placement: "line",
+                    maxAngle: Math.PI / 4,
+                    overflow: false,
+                    rotation: 0.0,
+                }),
+            }),
         });
         this._map.addLayer(layerVector);
         const a = geojsonSource.getFeatures()[0];
@@ -395,8 +427,14 @@ class OGIS {
             return container;
         });
         let geometryFunction;
+        const draw = new Draw({
+            source: undefined,
+            type: "LineString",
+            geometryFunction: geometryFunction,
+        });
+        this._map.addInteraction(draw);
         const modify = new Modify({ source: geojsonSource });
-        //this._map?.addInteraction(modify);
+        (_b = this._map) === null || _b === void 0 ? void 0 : _b.addInteraction(modify);
         /* const draw = new Draw({
              source: geojsonSource as VectorSource,
              type: FeatureType.Point,
@@ -427,6 +465,7 @@ _OGIS_instances = new WeakSet(), _OGIS_initMultiSelect = function _OGIS_initMult
     });
     multiSelect.on('select', event => {
         var _a, _b, _c;
+        console.log("event", event);
         console.log("event.selected", event.selected);
         if (event.selected.length == 0) {
             (_a = this.multiSelectOverlay) === null || _a === void 0 ? void 0 : _a.setPosition(undefined);

@@ -1,6 +1,9 @@
 
 //base
-import Map from 'ol/Map';
+import ol from 'ol'
+import * as olExtent from 'ol/extent';
+
+import OlMap from 'ol/Map';
 import View from 'ol/View';
 import TileLayer from 'ol/layer/Tile';
 
@@ -169,13 +172,22 @@ const defaultMultiSelectContainer:MultiSelectContainer = (overlayManager:Overlay
     return container;
 };
 
+type SingleSelectContainer=(overlayManager:OverlayManager,featureList:Array<Feature>)=>HTMLElement;
+
+
+class ConnectInfoViewData{
+  public virtualFeature:Feature|undefined;
+  public overLay:Overlay|undefined;
+}
+
+
 class OGIS{
     
 
     // 기본값들
     private  _targetElement // map이 생성될 target element 이다.
     private  _mapView?:View // 맵뷰지정
-    private  _map?:Map 
+    private  _map?:OlMap 
 
 
     private multiSelectOverlay?:Overlay;
@@ -186,8 +198,17 @@ class OGIS{
     private overlayManager?:OverlayManager; // 멀티셀렉트 매니저
 
 
+    //// 싱글셀렉트
+    public singleSelectContainer:SingleSelectContainer|undefined; //싱글셀렉트 콘테이너
+
+
+
+
     //// 가상뷰, 떠있는 정보뷰를 위한
-    private _stayInfoViewMap=new Map()
+    private const connectFeatureInfoHash:Map<Feature,ConnectInfoViewData> = new Map<Feature,ConnectInfoViewData>();
+
+  
+    private _stayInfoViewMap=new OlMap()
     private connectFeatureInfoLayer:VectorLayer<VectorSource>=new VectorLayer({
       source: new VectorSource(),
       style: {
@@ -199,6 +220,7 @@ class OGIS{
         },
         zIndex:100
   });
+
   
 
 
@@ -230,7 +252,7 @@ class OGIS{
           }
           
            // 맵 만들기
-        this._map=new Map({
+        this._map=new OlMap({
             target: this._targetElement,
             layers: [new TileLayer({source: new OSM()})],
             view: this._mapView,
@@ -261,8 +283,9 @@ class OGIS{
       });
 
       multiSelect.on('select',event=>{
-        console.log("event.selected",event.selected)
 
+        console.log("event",event)
+        console.log("event.selected",event.selected)
         if(event.selected.length==0)
         {
           this.multiSelectOverlay?.setPosition(undefined)
@@ -291,10 +314,10 @@ class OGIS{
     connectInfoViewOn(feature:Feature ,viewCreater:(feature:Feature)=>HTMLElement)
     {
       const view = viewCreater(feature)
-
-      
       const geometry = feature.getGeometry() as SimpleGeometry
       const originPosition = geometry.getFirstCoordinate();
+
+      
 
       // 띄울 좌표
       let pixel = this._map!.getPixelFromCoordinate(originPosition);
@@ -318,8 +341,6 @@ class OGIS{
       {
          position=virtualLineString.getGeometry()!.getLastCoordinate()
       }
-
-
 
 
       const overlay:Overlay =  new Overlay({
@@ -406,6 +427,31 @@ class OGIS{
 
       })
 
+
+      const data = new ConnectInfoViewData();
+      data.virtualFeature=virtualLineString;
+      data.overLay=overlay
+      this.connectFeatureInfoHash.set(feature,data);
+    }
+
+    
+    connectInfoViewOff(feature:Feature)
+    {
+
+      const data = this.connectFeatureInfoHash.get(feature)
+      if(data)
+      {
+
+        if(data.overLay)
+        {
+          this._map?.removeOverlay(data.overLay);
+        }
+        if(data.virtualFeature)
+        {
+          this.connectFeatureInfoLayer.getSource()?.removeFeature(data.virtualFeature)
+        }
+     
+      }
     }
 
 
@@ -413,7 +459,7 @@ class OGIS{
 
     /* ========================= 편집 기능 =========================== */
     /// 생성기능
-    drawAble(featureMode,source)
+    onDrawable(featureMode,source)
     {
   
         let featureType=featureMode;
@@ -438,10 +484,10 @@ class OGIS{
         const snap = new Snap({source: source});
         this._map!.addInteraction( snap);
 
+        
+
         return {draw:draw,modify:modify,snap:snap}
     }
-
-
 
 
     /// 생성기능 끄기
@@ -451,6 +497,8 @@ class OGIS{
       this._map!.removeInteraction(interactions.modify);
       this._map!.removeInteraction(interactions.snap);
     }
+
+
 
 
 
@@ -555,13 +603,28 @@ class OGIS{
 
           const layerVector = new VectorLayer({
             source:geojsonSource as any,
-            style: {
-            'fill-color': 'rgba(255, 255, 255, 0.2)',
-            'stroke-color': '#ffcc33',
-            'stroke-width': 2,
-            'circle-radius': 7,
-            'circle-fill-color': '#ff0000',
-          },
+            style: new Style( {
+              stroke: new Stroke({
+                
+                color: '#ffcc33',
+                width: 2,
+              }),
+              text: new Text({
+                textAlign: "center",
+                textBaseline: "middle",
+                font: "Blod" + " " + "30px" + "/" + 3 + " " + "arial",
+                text: "111111111111111",
+                fill: new Fill({ color: "blue" }),
+                stroke: new Stroke({ color: "0xff00ff", width: 3.0 }),
+                offsetX: 0,
+                offsetY: 0,
+                placement: "line",
+                maxAngle: Math.PI / 4,
+                overflow: false,
+                rotation: 0.0,
+              }),
+      
+          }),
         });
 
 
@@ -595,8 +658,16 @@ class OGIS{
         let geometryFunction;
       
 
+        const draw = new Draw({
+          source: undefined,
+          type: "LineString",
+          geometryFunction: geometryFunction,
+        });
+        this._map!.addInteraction( draw );
+
+
         const modify= new Modify({source: geojsonSource as VectorSource});
-        //this._map?.addInteraction(modify);
+        this._map?.addInteraction(modify);
 
        /* const draw = new Draw({
             source: geojsonSource as VectorSource,

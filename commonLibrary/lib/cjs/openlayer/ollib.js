@@ -434,6 +434,7 @@ _OGIS_instances = new WeakSet(), _OGIS_initMultiSelect = function _OGIS_initMult
     });
     multiSelect.on('select', event => {
         var _a, _b, _c;
+        console.log("event", event);
         console.log("event.selected", event.selected);
         if (event.selected.length == 0) {
             (_a = this.multiSelectOverlay) === null || _a === void 0 ? void 0 : _a.setPosition(undefined);

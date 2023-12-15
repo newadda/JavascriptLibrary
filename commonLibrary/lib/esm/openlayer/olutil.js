@@ -92,3 +92,5 @@ function testVectorLayer() {
         },
     });
 }
+class StyleUtil {
+}
