@@ -35,8 +35,8 @@ import {get, toLonLat} from 'ol/proj.js';
 
 // style
 import {Circle, Fill, Icon, Stroke, Style, Text} from 'ol/style.js';
-
-
+import {unByKey} from 'ol/Observable.js';
+import {easeOut} from 'ol/easing.js'
 //etc
 import GeoJSON from 'ol/format/GeoJSON.js';
 import {WKT} from 'ol/format.js'
@@ -45,6 +45,8 @@ import * as Extent from 'ol/extent'
 import Layer from 'ol/layer/Layer';
 import BaseVectorLayer from 'ol/layer/BaseVector';
 import { Coordinate } from 'ol/coordinate';
+import { getVectorContext } from 'ol/render';
+import CircleStyle from 'ol/style/Circle';
 
 
 ////////// Utils
@@ -91,6 +93,42 @@ class OGisUtils{
          }
  
      }
+
+
+     static getCentroid(points) {
+      var area = 0,
+          cx = 0,
+          cy = 0;
+    
+      for(var i = 0; i < points.length; i++){
+        var j = (i + 1) % points.length;
+    
+        var pt1 = points[i];
+        var pt2 = points[j];
+    
+        var x1 = pt1[0];
+        var x2 = pt2[0];
+        var y1 = pt1[1];
+        var y2 = pt2[1];
+    
+        area += x1 * y2;
+        area -= y1 * x2;
+    
+        cx += ((x1 + x2) * ((x1 * y2) - (x2 * y1)));
+        cy += ((y1 + y2) * ((x1 * y2) - (x2 * y1)));
+      }
+    
+      area /= 2;
+      area = Math.abs(area);
+    
+      cx = cx / (6.0 * area);
+      cy = cy / (6.0 * area);
+    
+      return {
+        x: Math.abs(cx),
+        y: Math.abs(cy)
+      };
+    }
  }
  
 
@@ -205,18 +243,19 @@ class OGIS{
 
 
     //// 가상뷰, 떠있는 정보뷰를 위한
-    private const connectFeatureInfoHash:Map<Feature,ConnectInfoViewData> = new Map<Feature,ConnectInfoViewData>();
+    private connectFeatureInfoHash:Map<Feature,ConnectInfoViewData> = new Map<Feature,ConnectInfoViewData>();
 
   
     private _stayInfoViewMap=new OlMap()
     private connectFeatureInfoLayer:VectorLayer<VectorSource>=new VectorLayer({
       source: new VectorSource(),
       style: {
-        'fill-color': 'rgba(255, 0, 0, 0.2)',
-        'stroke-color': 'rgba(255, 0, 0, 0.2)',
+        'fill-color': 'rgba(255, 0, 0, 0.9)',
+        'stroke-color': 'rgba(255, 0, 0, 0.9)',
         'stroke-width': 1,
         'circle-radius': 7,
         'circle-fill-color': '#ffcc33',
+        'stroke-line-dash':[2,3]
         },
         zIndex:100
   });
@@ -315,9 +354,41 @@ class OGIS{
     {
       const view = viewCreater(feature)
       const geometry = feature.getGeometry() as SimpleGeometry
-      const originPosition = geometry.getFirstCoordinate();
-
       
+      /// 내부의 중심을 구한다.
+      let originPosition;
+      if(geometry.getType() === 'Point' || geometry.getType() ==='LineString')
+      {
+        originPosition=geometry.getFirstCoordinate()
+
+      }else{
+
+        const centroid = OGisUtils.getCentroid(geometry.getCoordinates())
+        console.log("centroid",centroid)
+        originPosition=[centroid.x, centroid.y]
+
+        /*
+        const coordinates = geometry.getCoordinates()!;
+       
+        const xCollection=[] as number[];
+        const yCollection=[] as number[];
+       
+        for(let i=0;i< coordinates.length;i++)
+        {
+           
+          xCollection.push(Number(coordinates[i][0]))
+          yCollection.push(Number(coordinates[i][1]))
+        }
+  
+        const centerX = (Math.min(...xCollection)+Math.max(...xCollection) )/2
+        const centerY = (Math.min(...yCollection)+Math.max(...yCollection) )/2
+        originPosition = [centerX,centerY]
+      */
+      }
+
+     
+      
+   
 
       // 띄울 좌표
       let pixel = this._map!.getPixelFromCoordinate(originPosition);
@@ -655,6 +726,19 @@ class OGIS{
           return container;
 
         })
+
+        const c =  geojsonSource.getFeatures()[6]
+        this.connectInfoViewOn(c as Feature,(f)=>{
+
+         
+          const container = document.createElement('div');
+          container.style.width='300px';
+          container.style.backgroundColor='#ff0000'
+          container.innerHTML="test";
+          return container;
+
+        })
+
         let geometryFunction;
       
 
@@ -678,8 +762,7 @@ class OGIS{
     */
         const snap = new Snap({source: geojsonSource as VectorSource});
         //this._map?.addInteraction( snap);
-
-
+        
     }
 }
 

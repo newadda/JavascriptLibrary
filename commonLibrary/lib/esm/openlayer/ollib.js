@@ -4,7 +4,6 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
 var _OGIS_instances, _OGIS_initMultiSelect;
-//base
 import OlMap from 'ol/Map';
 import View from 'ol/View';
 import TileLayer from 'ol/layer/Tile';
@@ -56,6 +55,30 @@ class OGisUtils {
         if (geometry instanceof Point) {
             return styles[Point.name];
         }
+    }
+    static getCentroid(points) {
+        var area = 0, cx = 0, cy = 0;
+        for (var i = 0; i < points.length; i++) {
+            var j = (i + 1) % points.length;
+            var pt1 = points[i];
+            var pt2 = points[j];
+            var x1 = pt1[0];
+            var x2 = pt2[0];
+            var y1 = pt1[1];
+            var y2 = pt2[1];
+            area += x1 * y2;
+            area -= y1 * x2;
+            cx += ((x1 + x2) * ((x1 * y2) - (x2 * y1)));
+            cy += ((y1 + y2) * ((x1 * y2) - (x2 * y1)));
+        }
+        area /= 2;
+        area = Math.abs(area);
+        cx = cx / (6.0 * area);
+        cy = cy / (6.0 * area);
+        return {
+            x: Math.abs(cx),
+            y: Math.abs(cy)
+        };
     }
 }
 // 빈 vector layer 
@@ -135,11 +158,12 @@ class OGIS {
         this.connectFeatureInfoLayer = new VectorLayer({
             source: new VectorSource(),
             style: {
-                'fill-color': 'rgba(255, 0, 0, 0.2)',
-                'stroke-color': 'rgba(255, 0, 0, 0.2)',
+                'fill-color': 'rgba(255, 0, 0, 0.9)',
+                'stroke-color': 'rgba(255, 0, 0, 0.9)',
                 'stroke-width': 1,
                 'circle-radius': 7,
                 'circle-fill-color': '#ffcc33',
+                'stroke-line-dash': [2, 3]
             },
             zIndex: 100
         });
@@ -173,7 +197,33 @@ class OGIS {
         var _a, _b;
         const view = viewCreater(feature);
         const geometry = feature.getGeometry();
-        const originPosition = geometry.getFirstCoordinate();
+        /// 내부의 중심을 구한다.
+        let originPosition;
+        if (geometry.getType() === 'Point' || geometry.getType() === 'LineString') {
+            originPosition = geometry.getFirstCoordinate();
+        }
+        else {
+            const centroid = OGisUtils.getCentroid(geometry.getCoordinates());
+            console.log("centroid", centroid);
+            originPosition = [centroid.x, centroid.y];
+            /*
+            const coordinates = geometry.getCoordinates()!;
+           
+            const xCollection=[] as number[];
+            const yCollection=[] as number[];
+           
+            for(let i=0;i< coordinates.length;i++)
+            {
+               
+              xCollection.push(Number(coordinates[i][0]))
+              yCollection.push(Number(coordinates[i][1]))
+            }
+      
+            const centerX = (Math.min(...xCollection)+Math.max(...xCollection) )/2
+            const centerY = (Math.min(...yCollection)+Math.max(...yCollection) )/2
+            originPosition = [centerX,centerY]
+          */
+        }
         // 띄울 좌표
         let pixel = this._map.getPixelFromCoordinate(originPosition);
         let floatingCoordinate = originPosition;
@@ -420,6 +470,14 @@ class OGIS {
         });
         const b = geojsonSource.getFeatures()[1];
         this.connectInfoViewOn(b, (f) => {
+            const container = document.createElement('div');
+            container.style.width = '300px';
+            container.style.backgroundColor = '#ff0000';
+            container.innerHTML = "test";
+            return container;
+        });
+        const c = geojsonSource.getFeatures()[6];
+        this.connectInfoViewOn(c, (f) => {
             const container = document.createElement('div');
             container.style.width = '300px';
             container.style.backgroundColor = '#ff0000';
