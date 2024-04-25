@@ -97,3 +97,5 @@ function testVectorLayer() {
         },
     });
 }
+class StyleUtil {
+}

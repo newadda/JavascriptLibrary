@@ -24,6 +24,7 @@ declare class OverlayManager {
 }
 type MultiSelectContainer = (overlayManager: OverlayManager, featureList: Array<Feature>) => HTMLElement;
 type MultiSelectListener = (featureList: Array<Feature>) => void;
+type SingleSelectContainer = (overlayManager: OverlayManager, featureList: Array<Feature>) => HTMLElement;
 declare class OGIS {
     #private;
     private _targetElement;
@@ -33,13 +34,16 @@ declare class OGIS {
     multiSelectContainer: MultiSelectContainer;
     multiSelectListener?: MultiSelectListener;
     private overlayManager?;
+    singleSelectContainer: SingleSelectContainer | undefined;
+    private connectFeatureInfoHash;
     private _stayInfoViewMap;
     private connectFeatureInfoLayer;
     constructor(target: Element, options?: OGISProperty);
     private init;
     initConnectInfoView(): void;
     connectInfoViewOn(feature: Feature, viewCreater: (feature: Feature) => HTMLElement): void;
-    drawAble(featureMode: any, source: any): {
+    connectInfoViewOff(feature: Feature): void;
+    onDrawable(featureMode: any, source: any): {
         draw: Draw;
         modify: Modify;
         snap: Snap;

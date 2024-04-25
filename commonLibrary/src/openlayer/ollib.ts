@@ -512,7 +512,6 @@ class OGIS{
       const data = this.connectFeatureInfoHash.get(feature)
       if(data)
       {
-
         if(data.overLay)
         {
           this._map?.removeOverlay(data.overLay);

@@ -10,7 +10,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 var _OGIS_instances, _OGIS_initMultiSelect;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.OGIS = void 0;
-//base
 const Map_1 = __importDefault(require("ol/Map"));
 const View_1 = __importDefault(require("ol/View"));
 const Tile_1 = __importDefault(require("ol/layer/Tile"));
@@ -62,6 +61,30 @@ class OGisUtils {
         if (geometry instanceof geom_1.Point) {
             return styles[geom_1.Point.name];
         }
+    }
+    static getCentroid(points) {
+        var area = 0, cx = 0, cy = 0;
+        for (var i = 0; i < points.length; i++) {
+            var j = (i + 1) % points.length;
+            var pt1 = points[i];
+            var pt2 = points[j];
+            var x1 = pt1[0];
+            var x2 = pt2[0];
+            var y1 = pt1[1];
+            var y2 = pt2[1];
+            area += x1 * y2;
+            area -= y1 * x2;
+            cx += ((x1 + x2) * ((x1 * y2) - (x2 * y1)));
+            cy += ((y1 + y2) * ((x1 * y2) - (x2 * y1)));
+        }
+        area /= 2;
+        area = Math.abs(area);
+        cx = cx / (6.0 * area);
+        cy = cy / (6.0 * area);
+        return {
+            x: Math.abs(cx),
+            y: Math.abs(cy)
+        };
     }
 }
 // 빈 vector layer 
@@ -128,21 +151,25 @@ const defaultMultiSelectContainer = (overlayManager, featureList) => {
     }
     return container;
 };
+class ConnectInfoViewData {
+}
 class OGIS {
     constructor(target, options = new OGISProperty()) {
         _OGIS_instances.add(this);
         //// 멀티셀렉트
         this.multiSelectContainer = defaultMultiSelectContainer; // 멀티셀렉트시 생성 UI
         //// 가상뷰, 떠있는 정보뷰를 위한
+        this.connectFeatureInfoHash = new Map();
         this._stayInfoViewMap = new Map_1.default();
         this.connectFeatureInfoLayer = new Vector_js_1.default({
             source: new Vector_js_2.default(),
             style: {
-                'fill-color': 'rgba(255, 0, 0, 0.2)',
-                'stroke-color': 'rgba(255, 0, 0, 0.2)',
+                'fill-color': 'rgba(255, 0, 0, 0.9)',
+                'stroke-color': 'rgba(255, 0, 0, 0.9)',
                 'stroke-width': 1,
                 'circle-radius': 7,
                 'circle-fill-color': '#ffcc33',
+                'stroke-line-dash': [2, 3]
             },
             zIndex: 100
         });
@@ -176,7 +203,33 @@ class OGIS {
         var _a, _b;
         const view = viewCreater(feature);
         const geometry = feature.getGeometry();
-        const originPosition = geometry.getFirstCoordinate();
+        /// 내부의 중심을 구한다.
+        let originPosition;
+        if (geometry.getType() === 'Point' || geometry.getType() === 'LineString') {
+            originPosition = geometry.getFirstCoordinate();
+        }
+        else {
+            const centroid = OGisUtils.getCentroid(geometry.getCoordinates());
+            console.log("centroid", centroid);
+            originPosition = [centroid.x, centroid.y];
+            /*
+            const coordinates = geometry.getCoordinates()!;
+           
+            const xCollection=[] as number[];
+            const yCollection=[] as number[];
+           
+            for(let i=0;i< coordinates.length;i++)
+            {
+               
+              xCollection.push(Number(coordinates[i][0]))
+              yCollection.push(Number(coordinates[i][1]))
+            }
+      
+            const centerX = (Math.min(...xCollection)+Math.max(...xCollection) )/2
+            const centerY = (Math.min(...yCollection)+Math.max(...yCollection) )/2
+            originPosition = [centerX,centerY]
+          */
+        }
         // 띄울 좌표
         let pixel = this._map.getPixelFromCoordinate(originPosition);
         let floatingCoordinate = originPosition;
@@ -252,10 +305,26 @@ class OGIS {
                 virtualLineString.getGeometry().getLastCoordinate()
             ]);
         });
+        const data = new ConnectInfoViewData();
+        data.virtualFeature = virtualLineString;
+        data.overLay = overlay;
+        this.connectFeatureInfoHash.set(feature, data);
+    }
+    connectInfoViewOff(feature) {
+        var _a, _b;
+        const data = this.connectFeatureInfoHash.get(feature);
+        if (data) {
+            if (data.overLay) {
+                (_a = this._map) === null || _a === void 0 ? void 0 : _a.removeOverlay(data.overLay);
+            }
+            if (data.virtualFeature) {
+                (_b = this.connectFeatureInfoLayer.getSource()) === null || _b === void 0 ? void 0 : _b.removeFeature(data.virtualFeature);
+            }
+        }
     }
     /* ========================= 편집 기능 =========================== */
     /// 생성기능
-    drawAble(featureMode, source) {
+    onDrawable(featureMode, source) {
         let featureType = featureMode;
         let geometryFunction;
         if (featureType === FeatureType.PolygonBox) {
@@ -281,7 +350,7 @@ class OGIS {
         this._map.removeInteraction(interactions.snap);
     }
     test() {
-        var _a;
+        var _a, _b;
         (_a = this._map) === null || _a === void 0 ? void 0 : _a.addLayer(new Tile_1.default({ source: new OSM_js_1.default() }));
         let geojson = {
             "type": "FeatureCollection",
@@ -375,13 +444,26 @@ class OGIS {
         console.info(geojsonSource.getFeatures());
         const layerVector = new Vector_js_1.default({
             source: geojsonSource,
-            style: {
-                'fill-color': 'rgba(255, 255, 255, 0.2)',
-                'stroke-color': '#ffcc33',
-                'stroke-width': 2,
-                'circle-radius': 7,
-                'circle-fill-color': '#ff0000',
-            },
+            style: new style_js_1.Style({
+                stroke: new style_js_1.Stroke({
+                    color: '#ffcc33',
+                    width: 2,
+                }),
+                text: new style_js_1.Text({
+                    textAlign: "center",
+                    textBaseline: "middle",
+                    font: "Blod" + " " + "30px" + "/" + 3 + " " + "arial",
+                    text: "111111111111111",
+                    fill: new style_js_1.Fill({ color: "blue" }),
+                    stroke: new style_js_1.Stroke({ color: "0xff00ff", width: 3.0 }),
+                    offsetX: 0,
+                    offsetY: 0,
+                    placement: "line",
+                    maxAngle: Math.PI / 4,
+                    overflow: false,
+                    rotation: 0.0,
+                }),
+            }),
         });
         this._map.addLayer(layerVector);
         const a = geojsonSource.getFeatures()[0];
@@ -400,9 +482,23 @@ class OGIS {
             container.innerHTML = "test";
             return container;
         });
+        const c = geojsonSource.getFeatures()[6];
+        this.connectInfoViewOn(c, (f) => {
+            const container = document.createElement('div');
+            container.style.width = '300px';
+            container.style.backgroundColor = '#ff0000';
+            container.innerHTML = "test";
+            return container;
+        });
         let geometryFunction;
+        const draw = new interaction_js_1.Draw({
+            source: undefined,
+            type: "LineString",
+            geometryFunction: geometryFunction,
+        });
+        this._map.addInteraction(draw);
         const modify = new interaction_js_1.Modify({ source: geojsonSource });
-        //this._map?.addInteraction(modify);
+        (_b = this._map) === null || _b === void 0 ? void 0 : _b.addInteraction(modify);
         /* const draw = new Draw({
              source: geojsonSource as VectorSource,
              type: FeatureType.Point,

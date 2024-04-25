@@ -35,7 +35,7 @@ declare class OGIS {
     multiSelectListener?: MultiSelectListener;
     private overlayManager?;
     singleSelectContainer: SingleSelectContainer | undefined;
-    private const connectFeatureInfoHash;
+    private connectFeatureInfoHash;
     private _stayInfoViewMap;
     private connectFeatureInfoLayer;
     constructor(target: Element, options?: OGISProperty);
